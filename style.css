@@ -1,0 +1,126 @@
+/* ============ 消息内图片样式 ============ */
+
+.auto-illust-wrapper {
+  text-align: center;
+  margin: 14px 0;
+  position: relative;
+}
+
+.auto-illust-img {
+  max-width: 50%;
+  max-height: 500px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.auto-illust-img.loaded {
+  opacity: 1;
+}
+
+.auto-illust-caption {
+  font-size: 11px;
+  color: #888;
+  margin-top: 6px;
+  font-style: italic;
+  transition: color 0.2s;
+}
+
+.auto-illust-caption:hover {
+  color: #aaa;
+}
+
+/* ============ 设置面板样式 ============ */
+
+.auto-illust-settings .inline-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auto-illust-settings h4 {
+  margin: 10px 0 5px 0;
+  color: #ccc;
+}
+
+.auto-illust-settings small {
+  color: #888;
+  font-size: 11px;
+}
+
+.auto-illust-settings small a {
+  color: #6fa8dc;
+}
+
+.auto-illust-settings hr {
+  border: none;
+  border-top: 1px solid #444;
+  margin: 8px 0;
+}
+
+.auto-illust-test-area {
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.auto-illust-test-area input {
+  margin-bottom: 8px;
+}
+
+#ai_test_result {
+  min-height: 40px;
+  margin-top: 8px;
+}
+
+/* ============ 模型选择器增强 ============ */
+
+#ai_model_select optgroup {
+  font-style: normal;
+  font-weight: bold;
+  color: #aaa;
+  padding: 4px 0;
+}
+
+#ai_model_select option {
+  font-weight: normal;
+  color: #ddd;
+  padding: 4px 8px;
+}
+
+#ai_model_search {
+  font-size: 13px;
+}
+
+/* 连接状态动画 */
+#ai_connection_status,
+#ai_model_status {
+  transition: color 0.3s;
+}
+
+/* ============ 加载动画 ============ */
+
+.auto-illust-loading {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auto-illust-spinner {
+  text-align: center;
+  padding: 16px;
+}
+
+.auto-illust-spinner-text {
+  color: #888;
+  font-size: 13px;
+  animation: auto-illust-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes auto-illust-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
