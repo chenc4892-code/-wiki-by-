@@ -21,7 +21,7 @@ async function searchWikipediaArticle(query, lang) {
       .filter(p => p.original && /\.(jpe?g|png|webp)/i.test(p.original.source))
       .map(p => ({
         url: p.original.source,
-        thumbnail: p.original.source.replace(/\/commons\//, '/commons/thumb/') + '/400px-' + p.original.source.split('/').pop(),
+        thumbnail: p.original.source.replace(/\/commons\//, '/commons/thumb/') + '/800px-' + p.original.source.split('/').pop(),
         title: p.title || '',
         source: `${lang}.wikipedia`,
         width: p.original.width || 0,
@@ -70,7 +70,7 @@ async function searchWikimediaCommons(query) {
         const filename = p.title.replace('File:', '');
         return {
           url: info.url,
-          thumbnail: `https://commons.wikimedia.org/w/thumb.php?f=${encodeURIComponent(filename)}&w=400`,
+          thumbnail: `https://commons.wikimedia.org/w/thumb.php?f=${encodeURIComponent(filename)}&w=800`,
           title: p.title.replace('File:', '').replace(/\.\w+$/, '').replace(/_/g, ' '),
           source: 'commons',
           width: info.width || 0,

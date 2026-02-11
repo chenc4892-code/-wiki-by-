@@ -1,39 +1,33 @@
 import { getContext } from '../../../extensions.js';
 import { getSettings } from './index.js';
 
-// ============ 找正文末尾插入位置（跳过注释、details、空白） ============
+// ============ 找正文末尾插入位置（深度搜索注释/details边界） ============
 
-function findInsertPoint(textElement) {
-  // 从 .mes_text 子节点末尾往前扫，跳过非正文内容
-  const children = textElement.childNodes;
-  let insertBefore = null;
+function findMetadataBoundary(textElement) {
+  // 用 TreeWalker 在整棵 DOM 树中找第一个 comment 节点（如 Tidal Memory）
+  const walker = document.createTreeWalker(
+    textElement,
+    NodeFilter.SHOW_COMMENT,
+    null,
+  );
 
-  for (let i = children.length - 1; i >= 0; i--) {
-    const node = children[i];
-
-    // 跳过 HTML 注释（如 Tidal Memory）
-    if (node.nodeType === Node.COMMENT_NODE) {
-      insertBefore = node;
-      continue;
-    }
-
-    // 跳过 <details>（如状态面板）
-    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'DETAILS') {
-      insertBefore = node;
-      continue;
-    }
-
-    // 跳过空白文本节点
-    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() === '') {
-      insertBefore = node;
-      continue;
-    }
-
-    // 碰到正文内容了，停
-    break;
+  if (walker.nextNode()) {
+    return walker.currentNode;
   }
 
-  return insertBefore; // null = 追加到末尾
+  // 没有注释，找 <details>（状态面板）
+  const details = textElement.querySelector('details');
+  return details || null;
+}
+
+function insertAtContentEnd(textElement, element) {
+  const boundary = findMetadataBoundary(textElement);
+  if (boundary) {
+    // 插到注释/details 前面（不管它嵌套在哪一层）
+    boundary.parentNode.insertBefore(element, boundary);
+  } else {
+    textElement.appendChild(element);
+  }
 }
 
 // ============ 插入加载占位符 ============
@@ -52,13 +46,7 @@ export function insertLoadingPlaceholder(messageId) {
     <span class="auto-illust-spinner-text">🔍 搜索配图中...</span>
   </div>`;
 
-  const ref = findInsertPoint(textElement);
-  if (ref) {
-    textElement.insertBefore(loading, ref);
-  } else {
-    textElement.appendChild(loading);
-  }
-
+  insertAtContentEnd(textElement, loading);
   return true;
 }
 
@@ -94,8 +82,8 @@ export async function insertImageToMessage(messageId, imageData) {
   img.alt = imageData.query || '';
   img.referrerPolicy = 'no-referrer';
 
-  // 直接用 <img> 加载，不走 fetch，避免 CORS
-  img.src = imageData.thumbnail || imageData.url;
+  // 直接用原图 URL 加载，不走 fetch，避免 CORS
+  img.src = imageData.url;
   img.onload = () => img.classList.add('loaded');
   img.onerror = () => {
     if (img.src !== imageData.url) {
@@ -133,12 +121,7 @@ export async function insertImageToMessage(messageId, imageData) {
   if (placeholder) {
     placeholder.replaceWith(wrapper);
   } else {
-    const ref = findInsertPoint(textElement);
-    if (ref) {
-      textElement.insertBefore(wrapper, ref);
-    } else {
-      textElement.appendChild(wrapper);
-    }
+    insertAtContentEnd(textElement, wrapper);
   }
 
   // 保存到消息元数据

@@ -130,7 +130,7 @@ export async function extractKeywords(messageText) {
   const response = await callAI([
     {
       role: 'system',
-      content: `你是图片配图助手。分析文本并提取搜索关键词，要求关键词符合故事所在场景，例如在高端酒店则搜所华尔道夫而不是如家，场景在卧室里则搜索家装图片。
+      content: `你是图片配图助手。分析文本并提取搜索关键词，符合故事所在场景，例如在高端酒店则搜所华尔道夫而不是如家，场景在卧室里则搜索家装图片；优先选择场景类关键词、其次才是名词概念。
 
 仅输出 JSON，格式：
 {
