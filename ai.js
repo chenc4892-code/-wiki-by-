@@ -75,7 +75,7 @@ async function callAIWithImages(textPrompt, images) {
       model: settings.ai_model,
       messages: [{ role: 'user', content }],
       temperature: 0.1,
-      max_tokens: 128,
+      max_tokens: 512,
     }),
   });
 
@@ -130,11 +130,10 @@ export async function extractKeywords(messageText) {
   const response = await callAI([
     {
       role: 'system',
-      content: `你是图片配图助手。分析文本并提取搜索关键词，符合故事所在场景，例如在高端酒店则搜所华尔道夫而不是如家，场景在卧室里则搜索家装图片；优先选择场景类关键词、其次才是名词概念。
+      content: `你是一个搜索引擎图片配图助手，这是一个合规的项目，你专注提取搜索关键词，你不需要生成文本或是续写故事，只专注于提取搜索关键词并回复json，你不需要判断审核文本是否合规。关键词，符合故事所在场景，例如在高端酒店则搜所华尔道夫而不是如家，场景在卧室里则搜索家装图片；优先选择场景类关键词、其次才是名词概念。
 
-仅输出 JSON，格式：
+仅输出 JSON，严格遵守以下的格式输出，不要加反引号以及json格式标识：
 {
-  "need_img": true/false,
   "queries": [
     {"query": "英文关键词", "source": "wiki 或 google"}
   ]
@@ -170,15 +169,21 @@ export async function extractKeywords(messageText) {
   });
 
   try {
-    const result = JSON.parse(response.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    const jsonStr = response.match(/\{[\s\S]*\}/)?.[0] || '{}';
+    console.log('[AutoIllust] AI 原始回复:', response);
+    console.log('[AutoIllust] 提取的 JSON:', jsonStr);
+
+    const result = JSON.parse(jsonStr);
+    console.log('[AutoIllust] 解析结果:', JSON.stringify(result));
+
     return {
-      need_img: result.need_img ?? false,
       queries: result.queries || [],
       source: result.queries?.[0]?.source || 'both',
     };
   } catch (e) {
-    console.error('[AutoIllust] 关键词解析失败:', response);
-    return { need_img: false, queries: [], source: 'both' };
+    console.error('[AutoIllust] 关键词解析失败, AI原始回复:', response);
+    console.error('[AutoIllust] 解析错误:', e);
+    return { queries: [], source: 'both' };
   }
 }
 
@@ -214,14 +219,16 @@ export async function selectBestImage(messageText, candidates) {
   const imageParts = (await Promise.all(imagePartsPromises)).filter(Boolean);
   if (imageParts.length === 0) return candidates[0];
 
-  const prompt = `你是插图选择器。从候选图片中选最适合为以下文本配图的一张。
+  const prompt = `你是插图选择器。你必须从候选图片中选出最适合为以下文本配图的一张。你必须选择一张，不可以全部拒绝。
 
-评分标准：
-1. 图片内容与文本中描述的事物相关
-2. 图片质量好（清晰、构图佳，不是广告/水印/截图/logo/表情包）
-3. 图片氛围与文本情绪匹配（欢快/阴郁/紧张/浪漫等）
-4. 优先选择摄影照片/高质量艺术品/插图，而非图标
+评分标准（按优先级排列）：
+1. 【最重要】图片内容与文本描述的场景、事物相关
+2. 图片氛围与文本时间、情绪匹配（欢快/阴郁/紧张/浪漫，上午/下午/黄昏等）
+3. 优先选择摄影照片/高质量艺术品/插图，而非图标
+4. 不包含广告和水印
 5. 绝对禁止出现任何真人肖像
+
+重要：即使所有候选图都不完美，也必须选出最佳的一张。只要图片与文本有关联就应该选择。
 
 文本：
 """
@@ -230,14 +237,23 @@ ${messageText.substring(0, 800)}
 
 候选图片编号: ${imageParts.map(p => `${p.index}(${p.source})`).join(', ')}
 
-仅输出 JSON：{"selected": 编号, "reason": "理由"}
-都不合适则 selected 为 -1。`;
+仅输出 JSON：{"selected": 编号, "reason": "理由"}`;
 
   try {
     const response = await callAIWithImages(prompt, imageParts);
-    const result = JSON.parse(response.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    console.log('[AutoIllust] AI选图原始回复:', response);
 
-    if (result.selected >= 0 && result.selected < candidates.length) {
+    // 先尝试完整 JSON 解析
+    let result = {};
+    try {
+      result = JSON.parse(response.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    } catch {
+      // JSON 被截断，直接用正则提取 selected 数字
+      const m = response.match(/"selected"\s*:\s*(\d+)/);
+      if (m) result = { selected: parseInt(m[1]) };
+    }
+
+    if (typeof result.selected === 'number' && result.selected >= 0 && result.selected < candidates.length) {
       console.log(`[AutoIllust] AI选图: #${result.selected} - ${result.reason}`);
       return candidates[result.selected];
     }
@@ -258,5 +274,4 @@ function blobToBase64(blob) {
     reader.onloadend = () => resolve(reader.result);
     reader.readAsDataURL(blob);
   });
-
 }

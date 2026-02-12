@@ -1,32 +1,28 @@
 import { getContext } from '../../../extensions.js';
 import { getSettings } from './index.js';
 
-// ============ 找正文末尾插入位置（深度搜索注释/details边界） ============
+// ============ 在 innerHTML 中找元数据起始位置（纯字符串，不受 <content> 影响） ============
 
-function findMetadataBoundary(textElement) {
-  // 用 TreeWalker 在整棵 DOM 树中找第一个 comment 节点（如 Tidal Memory）
-  const walker = document.createTreeWalker(
-    textElement,
-    NodeFilter.SHOW_COMMENT,
-    null,
-  );
+function findMetadataIndex(html) {
+  const commentIdx = html.indexOf('<!--');
+  const detailsIdx = html.indexOf('<details');
 
-  if (walker.nextNode()) {
-    return walker.currentNode;
+  if (commentIdx !== -1 && detailsIdx !== -1) {
+    return Math.min(commentIdx, detailsIdx);
   }
-
-  // 没有注释，找 <details>（状态面板）
-  const details = textElement.querySelector('details');
-  return details || null;
+  if (commentIdx !== -1) return commentIdx;
+  if (detailsIdx !== -1) return detailsIdx;
+  return -1;
 }
 
-function insertAtContentEnd(textElement, element) {
-  const boundary = findMetadataBoundary(textElement);
-  if (boundary) {
-    // 插到注释/details 前面（不管它嵌套在哪一层）
-    boundary.parentNode.insertBefore(element, boundary);
+function spliceHtml(textElement, htmlStr) {
+  const raw = textElement.innerHTML;
+  const idx = findMetadataIndex(raw);
+
+  if (idx !== -1) {
+    textElement.innerHTML = raw.slice(0, idx) + htmlStr + raw.slice(idx);
   } else {
-    textElement.appendChild(element);
+    textElement.insertAdjacentHTML('beforeend', htmlStr);
   }
 }
 
@@ -39,14 +35,13 @@ export function insertLoadingPlaceholder(messageId) {
   const textElement = messageElement.querySelector('.mes_text');
   if (!textElement) return false;
 
-  const loading = document.createElement('div');
-  loading.className = 'auto-illust-wrapper auto-illust-loading';
-  loading.dataset.mesid = messageId;
-  loading.innerHTML = `<div class="auto-illust-spinner">
-    <span class="auto-illust-spinner-text">🔍 搜索配图中...</span>
+  const loadingHtml = `<div class="auto-illust-wrapper auto-illust-loading" data-mesid="${messageId}">
+    <div class="auto-illust-spinner">
+      <span class="auto-illust-spinner-text">🔍 搜索配图中...</span>
+    </div>
   </div>`;
 
-  insertAtContentEnd(textElement, loading);
+  spliceHtml(textElement, loadingHtml);
   return true;
 }
 
@@ -113,7 +108,7 @@ export async function insertImageToMessage(messageId, imageData) {
     wrapper.appendChild(caption);
   }
 
-  // 替换加载占位符，或插到正文末尾
+  // 替换加载占位符（占位符已经在正确位置）
   const placeholder = messageElement.querySelector(
     `.auto-illust-loading[data-mesid="${messageId}"]`
   );
@@ -121,7 +116,16 @@ export async function insertImageToMessage(messageId, imageData) {
   if (placeholder) {
     placeholder.replaceWith(wrapper);
   } else {
-    insertAtContentEnd(textElement, wrapper);
+    // 没有占位符（恢复场景）：用临时标记定位，再替换为真实元素
+    const tempId = `auto-illust-temp-${messageId}-${Date.now()}`;
+    spliceHtml(textElement, `<div id="${tempId}"></div>`);
+
+    const tempEl = document.getElementById(tempId);
+    if (tempEl) {
+      tempEl.replaceWith(wrapper);
+    } else {
+      textElement.appendChild(wrapper);
+    }
   }
 
   // 保存到消息元数据

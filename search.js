@@ -88,23 +88,10 @@ export async function searchWikimedia(query) {
   const settings = getSettings();
   const limit = settings.candidates_per_source;
 
-  // 判断是否包含中日韩文字
-  const hasCJK = /[\u4e00-\u9fff\u3040-\u30ff\u3400-\u4dbf]/.test(query);
-
   let results = [];
 
-  // 按语言优先级搜 Wikipedia
-  if (hasCJK) {
-    results = await searchWikipediaArticle(query, 'zh');
-    if (results.length < 2) {
-      results.push(...await searchWikipediaArticle(query, 'en'));
-    }
-  } else {
-    results = await searchWikipediaArticle(query, 'en');
-    if (results.length < 2) {
-      results.push(...await searchWikipediaArticle(query, 'zh'));
-    }
-  }
+  // 搜英文 Wikipedia
+  results = await searchWikipediaArticle(query, 'en');
 
   // Wikipedia 不够就搜 Commons
   if (results.length < limit) {
@@ -125,6 +112,21 @@ export async function searchWikimedia(query) {
 
 // ============ Google 搜索（通过 Serper.dev）============
 
+// 已知带水印的图库域名
+const WATERMARK_DOMAINS = [
+  'shutterstock.com', 'gettyimages.', 'istockphoto.com',
+  'alamy.com', 'depositphotos.com', '123rf.com',
+  'dreamstime.com', 'stock.adobe.com', 'bigstockphoto.com',
+  'thinkstockphotos.com', 'dissolve.com', 'pond5.com',
+  'vectorstock.com', 'canstockphoto.com',
+];
+
+function isWatermarkDomain(domain) {
+  if (!domain) return false;
+  const d = domain.toLowerCase();
+  return WATERMARK_DOMAINS.some(wd => d.includes(wd));
+}
+
 export async function searchGoogle(query) {
   const settings = getSettings();
 
@@ -134,6 +136,9 @@ export async function searchGoogle(query) {
   }
 
   try {
+    // 多请求一些，过滤后还能剩够
+    const requestNum = (settings.candidates_per_source || 4) + 6;
+
     const resp = await fetch('https://google.serper.dev/images', {
       method: 'POST',
       headers: {
@@ -142,7 +147,7 @@ export async function searchGoogle(query) {
       },
       body: JSON.stringify({
         q: query,
-        num: settings.candidates_per_source,
+        num: requestNum,
       }),
     });
 
@@ -150,16 +155,28 @@ export async function searchGoogle(query) {
 
     const data = await resp.json();
 
-    return (data.images || []).map(item => ({
-      url: item.imageUrl,
-      thumbnail: item.thumbnailUrl || item.imageUrl,
-      title: item.title || '',
-      source: 'google',
-      width: item.imageWidth || 0,
-      height: item.imageHeight || 0,
-      link: item.link || '',
-      domain: item.source || '',
-    }));
+    const results = (data.images || [])
+      .filter(item => {
+        const domain = (item.source || item.link || '').toLowerCase();
+        if (isWatermarkDomain(domain)) {
+          console.log(`[AutoIllust] 过滤水印图库: ${domain}`);
+          return false;
+        }
+        return true;
+      })
+      .map(item => ({
+        url: item.imageUrl,
+        thumbnail: item.thumbnailUrl || item.imageUrl,
+        title: item.title || '',
+        source: 'google',
+        width: item.imageWidth || 0,
+        height: item.imageHeight || 0,
+        link: item.link || '',
+        domain: item.source || '',
+      }));
+
+    console.log(`[AutoIllust] Google 搜索: ${data.images?.length || 0} 张, 过滤后 ${results.length} 张`);
+    return results.slice(0, settings.candidates_per_source);
   } catch (e) {
     console.error('[AutoIllust] Google 搜索失败:', e);
     return [];

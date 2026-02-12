@@ -64,8 +64,8 @@ async function onMessageReceived(messageId) {
     // ========== Step 1: AI 提取关键词 + 判断搜索源 ==========
     const analysis = await extractKeywords(message.mes);
 
-    if (!analysis.need_img || !analysis.queries?.length) {
-      console.log('[AutoIllust] 不需要配图');
+    if (!analysis.queries?.length) {
+      console.log('[AutoIllust] 没有提取到关键词');
       removeLoadingPlaceholder(messageId);
       return;
     }
