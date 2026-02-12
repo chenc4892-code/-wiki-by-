@@ -158,12 +158,7 @@ export async function extractKeywords(messageText) {
 - 最多 ${settings.max_queries} 个关键词
 - 从文本中提取最有视觉冲击力的事物
 - 中国特有事物可用中文（如 故宫、兵马俑）
-- 不要搜抽象概念、情感、日常动作
-
-## 不需要配图的情况
-- 纯对话/内心独白
-- 没有具体的可视觉化事物
-- 文本太短或太抽象`
+- 不要搜抽象概念、情感、日常动作`
     },
     {
       role: 'user',
@@ -263,4 +258,5 @@ function blobToBase64(blob) {
     reader.onloadend = () => resolve(reader.result);
     reader.readAsDataURL(blob);
   });
+
 }
